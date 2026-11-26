@@ -35,6 +35,8 @@ First, you need to create the database structure.
    ```
    *(This creates a database named `logistics_db` and builds all the necessary tables).*
 
+   > **Upgrading an older install?** If your database was created from an earlier version of `schema.sql`, run `node update_db.js` once from the `backend` folder to add the `app_settings` and `delivery_logs` tables.
+
 ### 2. Configure Environment Variables
 Inside the `backend/` folder, ensure you have a `.env` file (or rename `.env.example` to `.env`) with your actual MySQL credentials:
 ```env

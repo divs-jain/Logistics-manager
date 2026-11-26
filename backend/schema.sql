@@ -60,14 +60,34 @@ CREATE TABLE IF NOT EXISTS demand_inventory_mapping (
   UNIQUE KEY unique_demand_inventory (demand_item_id, inventory_item_id)
 );
 
+CREATE TABLE IF NOT EXISTS delivery_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  category_user_id INT NOT NULL,
+  delivered_by INT NOT NULL,
+  receiver_name VARCHAR(255) NOT NULL,
+  delivered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (category_user_id) REFERENCES users(id),
+  FOREIGN KEY (delivered_by) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS deliveries (
   id INT AUTO_INCREMENT PRIMARY KEY,
   mapping_id INT NOT NULL,
   delivered_qty INT NOT NULL,
   delivered_by INT NOT NULL,
   delivered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  delivery_log_id INT DEFAULT NULL,
   FOREIGN KEY (mapping_id) REFERENCES demand_inventory_mapping(id),
-  FOREIGN KEY (delivered_by) REFERENCES users(id)
+  FOREIGN KEY (delivered_by) REFERENCES users(id),
+  FOREIGN KEY (delivery_log_id) REFERENCES delivery_logs(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  setting_key VARCHAR(50) PRIMARY KEY,
+  setting_value VARCHAR(255)
+);
+
+INSERT IGNORE INTO app_settings (setting_key, setting_value)
+VALUES ('block_demands', 'false');
 
 -- Demo users: run `node seed.js` after schema import to create users with password "password123"

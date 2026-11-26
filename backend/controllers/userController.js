@@ -74,7 +74,7 @@ exports.deleteUser = async (req, res) => {
 
   try {
     // Cannot delete self
-    if (parseInt(id) === req.user.userId) {
+    if (parseInt(id) === req.user.id) {
       return res.status(400).json({ message: "Cannot delete your own account" });
     }
 

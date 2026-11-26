@@ -95,14 +95,6 @@ export default function DashboardPage() {
         value: stats.inventoryItems || 0,
         icon: Warehouse,
         color: "violet"
-      },
-      {
-        to: "/deliveries",
-        title: "Deliveries",
-        desc: "Fulfill allocated items",
-        value: stats.pendingDeliveries || 0,
-        icon: Truck,
-        color: "rose"
       }
     ],
     CATEGORY: [

@@ -30,11 +30,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickFill = (demoEmail) => {
-    setEmail(demoEmail);
-    setPassword("password123");
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 relative overflow-hidden font-sans">
       <div className="w-full max-w-[400px] z-10 transition-all duration-300">

@@ -31,18 +31,19 @@ exports.getInventory = async (req, res) => {
 
 exports.addInventoryItem = async (req, res) => {
   try {
-    const { name, unit, quantity, location } = req.body;
+    const { name, unit, location } = req.body;
+    const quantity = Number(req.body.quantity);
     const normalizedUnit = normalizeUnit(unit);
 
-    if (!name || !unit || !quantity) {
+    if (!name || !unit || !req.body.quantity) {
       return res.status(400).json({
         message: "Name, unit, and quantity are required",
       });
     }
 
-    if (quantity <= 0) {
+    if (!Number.isInteger(quantity) || quantity <= 0) {
       return res.status(400).json({
-        message: "Quantity must be greater than zero",
+        message: "Quantity must be a positive whole number",
       });
     }
 
@@ -135,7 +136,7 @@ exports.updateInventoryDetails = async (req, res) => {
       return res.status(400).json({ message: "Name and unit are required" });
     }
 
-    const normalizedUnit = unit.toUpperCase();
+    const normalizedUnit = String(unit).trim();
 
     // Check for duplicates
     const [existing] = await pool.execute(

@@ -32,7 +32,7 @@ export default function ManageAccountsPage() {
       setLoading(true);
       const res = await api.get("/users");
       setUsers(res.data);
-    } catch (err) {
+    } catch {
       showToast("Failed to load data", "error");
     } finally {
       setLoading(false);
@@ -45,7 +45,7 @@ export default function ManageAccountsPage() {
       await api.put(`/users/${userId}/block-demands`, { block_demands: newValue });
       showToast(newValue ? "Demand entering blocked for category" : "Demand entering unlocked for category");
       loadData();
-    } catch (err) {
+    } catch {
       showToast("Failed to update block status", "error");
     }
   };

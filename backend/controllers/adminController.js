@@ -1,5 +1,57 @@
 const pool = require("../config/db");
 
+// Supply vs demand per inventory SKU. Demand is the quantity mapped to this SKU
+// (not the whole demand line, which may be split across SKUs), and deliveries are
+// pre-aggregated per mapping so multiple deliveries don't multiply the demand.
+async function fetchInventoryAnalysis() {
+  const [rows] = await pool.execute(`
+    SELECT
+      ii.id,
+      ii.name,
+      ii.unit,
+      ii.quantity AS total_inventory,
+
+      COALESCE(SUM(CASE WHEN di.status = 'APPROVED' THEN dm.issued_qty END),0) AS total_demand,
+      COALESCE(SUM(dd.delivered_qty),0) AS delivered
+
+    FROM inventory_items ii
+    LEFT JOIN demand_inventory_mapping dm
+      ON dm.inventory_item_id = ii.id
+    LEFT JOIN demand_items di
+      ON di.id = dm.demand_item_id
+    LEFT JOIN (
+      SELECT mapping_id, SUM(delivered_qty) AS delivered_qty
+      FROM deliveries
+      GROUP BY mapping_id
+    ) dd
+      ON dd.mapping_id = dm.id
+
+    GROUP BY ii.id
+  `);
+
+  return rows.map(r => {
+    const totalDemand = Number(r.total_demand);
+    const delivered = Number(r.delivered);
+    const pending = totalDemand - delivered;
+    const status = r.total_inventory - pending; // S / D logic
+
+    return {
+      id: r.id,
+      item_name: r.name,
+      unit: r.unit,
+      total_inventory: r.total_inventory,
+      total_demand: totalDemand,
+      delivered,
+      status,
+    };
+  });
+}
+
+function csvField(value) {
+  const str = String(value ?? "");
+  return /[",\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
 exports.updateDemandItem = async (req, res) => {
   if (req.user.role !== "CC") {
     return res.status(403).json({ message: "Access denied" });
@@ -393,44 +445,7 @@ exports.getInventoryAnalysis = async (req, res) => {
       });
     }
 
-    const [rows] = await pool.execute(`
-      SELECT
-        ii.id,
-        ii.name,
-        ii.unit,
-        ii.quantity AS total_inventory,
-
-        COALESCE(SUM(COALESCE(di.negotiated_qty, di.requested_qty)),0) AS total_demand,
-        COALESCE(SUM(d.delivered_qty),0) AS delivered
-
-      FROM inventory_items ii
-      LEFT JOIN demand_inventory_mapping dm
-        ON dm.inventory_item_id = ii.id
-      LEFT JOIN demand_items di
-        ON di.id = dm.demand_item_id
-        AND di.status = 'APPROVED'
-      LEFT JOIN deliveries d
-        ON d.mapping_id = dm.id
-
-      GROUP BY ii.id
-    `);
-
-    const result = rows.map(r => {
-      const pending = r.total_demand - r.delivered;
-      const status = r.total_inventory - pending; // S / D logic
-
-      return {
-        id: r.id,
-        item_name: r.name,
-        unit: r.unit,
-        total_inventory: r.total_inventory,
-        total_demand: r.total_demand,
-        delivered: r.delivered,
-        status,
-      };
-    });
-
-    return res.json(result);
+    return res.json(await fetchInventoryAnalysis());
 
   } catch (err) {
     return res.status(500).json({
@@ -505,36 +520,16 @@ exports.exportInventoryAnalysisCSV = async (req, res) => {
       });
     }
 
-    const [rows] = await pool.execute(`
-      SELECT
-        ii.id,
-        ii.name,
-        ii.unit,
-        ii.quantity AS total_inventory,
-
-        COALESCE(SUM(COALESCE(di.negotiated_qty, di.requested_qty)),0) AS total_demand,
-        COALESCE(SUM(d.delivered_qty),0) AS delivered
-
-      FROM inventory_items ii
-      LEFT JOIN demand_inventory_mapping dm
-        ON dm.inventory_item_id = ii.id
-      LEFT JOIN demand_items di
-        ON di.id = dm.demand_item_id
-        AND di.status = 'APPROVED'
-      LEFT JOIN deliveries d
-        ON d.mapping_id = dm.id
-      GROUP BY ii.id
-    `);
+    const rows = await fetchInventoryAnalysis();
 
     // csv header
     let csv =
       "ID,Item Name,Unit,Total Inventory,Total Demand,Delivered,Status\n";
 
     rows.forEach(r => {
-      const pending = r.total_demand - r.delivered;
-      const status = r.total_inventory - pending; // S/D logic
-
-      csv += `${r.id},"${r.name}",${r.unit},${r.total_inventory},${r.total_demand},${r.delivered},${status}\n`;
+      csv += [r.id, r.item_name, r.unit, r.total_inventory, r.total_demand, r.delivered, r.status]
+        .map(csvField)
+        .join(",") + "\n";
     });
 
     // file response
@@ -674,7 +669,7 @@ exports.deleteMapping = async (req, res) => {
 
 exports.getDashboardStats = async (req, res) => {
   try {
-    const { role, userId } = req.user;
+    const { role, id: userId } = req.user;
     let stats = {};
 
     const [invRows] = await pool.execute("SELECT COUNT(id) as count FROM inventory_items");

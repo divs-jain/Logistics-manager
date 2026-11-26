@@ -88,7 +88,7 @@ function CCDeliveries() {
     }
 
     const items = Object.entries(deliveryInputs)
-      .filter(([_, qty]) => qty && Number(qty) > 0)
+      .filter(([, qty]) => qty && Number(qty) > 0)
       .map(([mapping_id, qty]) => ({
         mapping_id: Number(mapping_id),
         delivered_qty: Number(qty)

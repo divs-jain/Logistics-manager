@@ -33,8 +33,18 @@ exports.createDemandBatch = async (req, res) => {
     const { category_user_id } = req.body;
     const targetCategoryUserId = req.user.role === "CATEGORY" ? req.user.id : Number(category_user_id);
 
-    if (req.user.role === "CC" && !targetCategoryUserId) {
-      return res.status(400).json({ message: "Category user is required" });
+    if (req.user.role === "CC") {
+      if (!targetCategoryUserId) {
+        return res.status(400).json({ message: "Category user is required" });
+      }
+
+      const [targets] = await pool.execute(
+        "SELECT id FROM users WHERE id = ? AND role = 'CATEGORY'",
+        [targetCategoryUserId]
+      );
+      if (targets.length === 0) {
+        return res.status(400).json({ message: "Selected user is not a category account" });
+      }
     }
 
     const [result] = await pool.execute(
@@ -66,9 +76,18 @@ exports.addDemandItem = async (req, res) => {
       }
     }
 
-    const { raw_item_name, unit, requested_qty } = req.body;
+    const { raw_item_name, unit } = req.body;
+    const requested_qty = Number(req.body.requested_qty);
     const demandId = req.params.demandId;
     const normalizedUnit = normalizeUnit(unit);
+
+    if (!raw_item_name || !String(raw_item_name).trim()) {
+      return res.status(400).json({ message: "Item name is required" });
+    }
+
+    if (!Number.isInteger(requested_qty) || requested_qty <= 0) {
+      return res.status(400).json({ message: "Requested quantity must be a positive whole number" });
+    }
 
     const [demandRows] = await pool.execute(
       "SELECT category_user_id FROM category_demands WHERE id = ?",
@@ -87,7 +106,7 @@ exports.addDemandItem = async (req, res) => {
       `INSERT INTO demand_items
       (demand_id, raw_item_name, unit, requested_qty)
       VALUES (?, ?, ?, ?)`,
-      [demandId, raw_item_name, normalizedUnit, requested_qty]
+      [demandId, String(raw_item_name).trim(), normalizedUnit, requested_qty]
     );
 
     return res.json({
